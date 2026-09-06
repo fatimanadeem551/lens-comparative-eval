@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lens — Comparative Output Evaluation</title>
+<style>
+  :root{
+    --paper:#efece3;
+    --ink:#20221f;
+    --ink-soft:#5a5c53;
+    --line:#c9c5b6;
+    --lens-a:#3d5a4e;
+    --lens-b:#8a4a3a;
+    --lens-c:#4a4a70;
+    --amber:#b8862f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px;}
+  .kicker{
+    font-family: Georgia, serif;
+    font-style: italic;
+    color:var(--ink-soft);
+    font-size:14px;
+    margin:0 0 6px;
+  }
+  h1{
+    font-size: 34px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  .sub{
+    color:var(--ink-soft);
+    max-width: 60ch;
+    font-size:16px;
+    margin:0 0 28px;
+  }
+  hr.rule{border:none;border-top:2px solid var(--ink);margin:24px 0 28px;}
+
+  .prompt-box{
+    border:1.5px solid var(--ink);
+    padding:20px;
+    margin-bottom: 28px;
+  }
+  .field-label{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  textarea{
+    width:100%;
+    font-family: "Iowan Old Style", Georgia, serif;
+    font-size:16px;
+    padding:12px;
+    border:1px solid var(--line);
+    background:#fbfaf6;
+    color:var(--ink);
+    resize: vertical;
+    min-height:64px;
+  }
+  .row-between{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:16px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .hint{font-size:13px;color:var(--ink-soft);}
+
+  button{
+    font-family: inherit;
+    font-size:15px;
+    cursor:pointer;
+    border-radius:2px;
+  }
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+    border:1.5px solid var(--ink);
+    padding:10px 20px;
+  }
+  .btn-primary:disabled{
+    opacity:0.5;
+    cursor:default;
+  }
+  .btn-secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    padding:10px 20px;
+  }
+  .btn-secondary:disabled{opacity:0.4;cursor:default;}
+
+  .lens{
+    border:1.5px solid var(--ink);
+    margin-bottom:24px;
+  }
+  .lens-head{
+    padding:18px 20px 14px;
+  }
+  .lens-name{
+    font-size:20px;
+    font-weight:600;
+    margin:0 0 10px;
+  }
+  .lens-instructions{
+    width:100%;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size:13px;
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+    background:#fbfaf6;
+    padding:10px;
+    min-height:44px;
+  }
+  .temp-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:12px;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .temp-row input[type=range]{flex:1; accent-color: var(--ink);}
+  .temp-val{font-variant-numeric: tabular-nums; color:var(--amber); min-width:28px;}
+
+  .lens-output{
+    border-top:1.5px solid var(--ink);
+    padding:18px 20px;
+    min-height:70px;
+    font-size:15px;
+    white-space:pre-wrap;
+  }
+  .placeholder{font-style:italic;color:var(--ink-soft);}
+  .error-text{color:var(--lens-b); font-style:normal;}
+  .loading-text{color:var(--ink-soft); font-style:italic;}
+
+  .metrics{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .metrics b{color:var(--ink); font-weight:600;}
+
+  footer{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12px;
+    margin-top:40px;
+  }
+
+  .global-error{
+    border:1.5px solid var(--lens-b);
+    background: #f7ece9;
+    color: var(--lens-b);
+    padding:12px 16px;
+    margin-bottom:20px;
+    font-size:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+const { useState } = React ? {} : {}; // no-op guard, React not used — vanilla JS below
+</script>
+<script>
+(function(){
+
+  const LENS_DEFAULTS = [
+    {
+      id: 'formal',
+      name: 'Formal & Corporate',
+      color: 'var(--lens-a)',
+      instructions: 'Respond in a formal, corporate tone. Be precise, measured, and slightly reserved. Avoid contractions and casual language.',
+      temp: 0.3
+    },
+    {
+      id: 'warm',
+      name: 'Warm & Conversational',
+      color: 'var(--lens-b)',
+      instructions: 'Respond in a warm, conversational, empathetic tone, as if talking to a friend. Use contractions and plain language.',
+      temp: 0.7
+    },
+    {
+      id: 'concise',
+      name: 'Concise & Technical',
+      color: 'var(--lens-c)',
+      instructions: 'Respond concisely and precisely, prioritizing accuracy and information density over tone. Minimal pleasantries.',
+      temp: 0.2
+    }
+  ];
+
+  let state = {
+    prompt: 'Explain to a customer why their order shipment has been delayed by 5 days.',
+    lenses: LENS_DEFAULTS.map(l => ({...l})),
+    outputs: {},      // id -> text
+    status: {},       // id -> 'idle' | 'loading' | 'done' | 'error'
+    globalError: null,
+    running: false,
+    apiKey: ''
+  };
+
+  const app = document.getElementById('app');
+
+  function computeMetrics(text){
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const wordCount = words.length;
+    const sentenceCount = sentences.length || 1;
+    const avgWordLen = words.length
+      ? (words.reduce((a,w)=>a+w.replace(/[^a-zA-Z]/g,'').length,0) / words.length)
+      : 0;
+    const uniqueWords = new Set(words.map(w => w.toLowerCase().replace(/[^a-z']/g,''))).size;
+    const lexicalDiversity = wordCount ? uniqueWords / wordCount : 0;
+    return {
+      wordCount,
+      sentenceCount,
+      avgWordLen: avgWordLen.toFixed(1),
+      lexicalDiversity: (lexicalDiversity * 100).toFixed(0) + '%'
+    };
+  }
+
+  function escapeHtml(str){
+    return str
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;');
+  }
+
+  function render(){
+    let lensesHtml = state.lenses.map((lens, idx) => {
+      const status = state.status[lens.id] || 'idle';
+      const output = state.outputs[lens.id];
+
+      let outputHtml;
+      if (status === 'loading') {
+        outputHtml = `<div class="loading-text">Generating…</div>`;
+      } else if (status === 'error') {
+        outputHtml = `<div class="error-text">Error: ${escapeHtml(output || 'Request failed.')}</div>`;
+      } else if (status === 'done' && output) {
+        const m = computeMetrics(output);
+        outputHtml = `
+          <div>${escapeHtml(output)}</div>
+          <div class="metrics">
+            <span><b>${m.wordCount}</b> words</span>
+            <span><b>${m.sentenceCount}</b> sentences</span>
+            <span><b>${m.avgWordLen}</b> avg word length</span>
+            <span><b>${m.lexicalDiversity}</b> lexical diversity</span>
+          </div>`;
+      } else {
+        outputHtml = `<div class="placeholder">Output will appear here after you run the comparison.</div>`;
+      }
+
+      return `
+        <div class="lens">
+          <div class="lens-head" style="border-left:5px solid ${lens.color}; padding-left:16px;">
+            <p class="lens-name">${escapeHtml(lens.name)}</p>
+            <textarea class="lens-instructions" data-idx="${idx}" data-field="instructions" rows="2">${escapeHtml(lens.instructions)}</textarea>
+            <div class="temp-row">
+              <span>TEMP</span>
+              <input type="range" min="0" max="1" step="0.1" value="${lens.temp}" data-idx="${idx}" data-field="temp">
+              <span class="temp-val">${lens.temp.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="lens-output">${outputHtml}</div>
+        </div>`;
+    }).join('');
+
+    app.innerHTML = `
+      <p class="kicker">Lens — comparative output evaluation</p>
+      <h1>See how framing changes an answer.</h1>
+      <p class="sub">Send one prompt through three configurable lenses — different system instructions and temperatures — and compare the outputs side by side, with lightweight quality scoring on each.</p>
+      <hr class="rule">
+
+      ${state.globalError ? `<div class="global-error">${escapeHtml(state.globalError)}</div>` : ''}
+
+      <div class="prompt-box" style="margin-bottom:16px;">
+        <div class="field-label">YOUR ANTHROPIC API KEY</div>
+        <input type="password" id="api-key" placeholder="sk-ant-..." value="${escapeHtml(state.apiKey)}"
+          style="width:100%; font-family: ui-monospace, monospace; font-size:14px; padding:10px; border:1px solid var(--line); background:#fbfaf6; color:var(--ink);">
+        <p class="hint" style="margin:8px 0 0;">Stored only in this browser tab — never sent anywhere but Anthropic's API. Get a key at <span style="text-decoration:underline;">console.anthropic.com</span>.</p>
+      </div>
+
+      <div class="prompt-box">
+        <div class="field-label">SHARED PROMPT</div>
+        <textarea id="shared-prompt" rows="3">${escapeHtml(state.prompt)}</textarea>
+        <div class="row-between">
+          <span class="hint">Each lens below runs the same prompt under its own system instructions and temperature.</span>
+        </div>
+        <div class="row-between">
+          <button class="btn-secondary" id="save-btn" ${state.running ? 'disabled' : ''}>Save results</button>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-secondary" id="demo-btn">See example output</button>
+            <button class="btn-primary" id="run-btn" ${state.running ? 'disabled' : ''}>${state.running ? 'Running…' : 'Run comparison'}</button>
+          </div>
+        </div>
+      </div>
+
+      ${lensesHtml}
+
+      <footer>LENS · built with the Claude API</footer>
+    `;
+
+    // wire events after render
+    document.getElementById('shared-prompt').addEventListener('input', (e) => {
+      state.prompt = e.target.value;
+    });
+
+    document.getElementById('api-key').addEventListener('input', (e) => {
+      state.apiKey = e.target.value;
+    });
+
+    document.querySelectorAll('.lens-instructions').forEach(el => {
+      el.addEventListener('input', (e) => {
+        const idx = Number(e.target.dataset.idx);
+        state.lenses[idx].instructions = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('input[type=range]').forEach(el => {
+      el.addEventListener('input', (e) => {
+        const idx = Number(e.target.dataset.idx);
+        state.lenses[idx].temp = Number(e.target.value);
+        render();
+      });
+    });
+
+    document.getElementById('run-btn').addEventListener('click', runComparison);
+    document.getElementById('save-btn').addEventListener('click', saveResults);
+    document.getElementById('demo-btn').addEventListener('click', showDemoResults);
+  }
+
+  function showDemoResults(){
+    state.globalError = null;
+    const demoText = {
+      formal: "We regret to inform you that your order has experienced a delay of five days due to an unforeseen disruption in our fulfillment process. We are actively working to resolve this matter and will provide an updated delivery estimate at the earliest opportunity.",
+      warm: "Hey, so sorry about this — your order's running about 5 days behind schedule. Things got a bit backed up on our end, but we're on it and will get this sorted for you as fast as we can. Thanks so much for bearing with us!",
+      concise: "Order delayed 5 days due to fulfillment backlog. Updated delivery estimate to follow. Apologies for the inconvenience."
+    };
+    state.lenses.forEach(l => {
+      state.outputs[l.id] = demoText[l.id] || 'Example output not available for this lens.';
+      state.status[l.id] = 'done';
+    });
+    render();
+  }
+
+  function saveResults(){
+    try {
+      const payload = {
+        prompt: state.prompt,
+        results: state.lenses.map(l => ({
+          name: l.name,
+          instructions: l.instructions,
+          temp: l.temp,
+          output: state.outputs[l.id] || null
+        }))
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lens-comparison-results.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      state.globalError = 'Could not save results: ' + err.message;
+      render();
+    }
+  }
+
+  async function runComparison(){
+    if (!state.prompt.trim()) {
+      state.globalError = 'Enter a prompt before running the comparison.';
+      render();
+      return;
+    }
+    if (!state.apiKey.trim()) {
+      state.globalError = 'Enter your Anthropic API key above before running the comparison.';
+      render();
+      return;
+    }
+
+    state.globalError = null;
+    state.running = true;
+    state.lenses.forEach(l => { state.status[l.id] = 'loading'; state.outputs[l.id] = null; });
+    render();
+
+    await Promise.all(state.lenses.map(async (lens) => {
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': state.apiKey.trim(),
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1000,
+            system: lens.instructions,
+            temperature: lens.temp,
+            messages: [
+              { role: 'user', content: state.prompt }
+            ]
+          })
+        });
+
+        if (!response.ok) {
+          let detail = '';
+          try {
+            const errJson = await response.json();
+            detail = errJson?.error?.message || JSON.stringify(errJson);
+          } catch(_) {
+            detail = await response.text();
+          }
+          throw new Error(`HTTP ${response.status} — ${detail}`);
+        }
+
+        const data = await response.json();
+        const textBlocks = (data.content || [])
+          .filter(item => item.type === 'text')
+          .map(item => item.text);
+        const text = textBlocks.join('\n').trim();
+
+        if (!text) {
+          throw new Error('Response contained no text content.');
+        }
+
+        state.outputs[lens.id] = text;
+        state.status[lens.id] = 'done';
+      } catch (err) {
+        state.outputs[lens.id] = err.message || 'Unknown error.';
+        state.status[lens.id] = 'error';
+      }
+      render();
+    }));
+
+    state.running = false;
+    render();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
